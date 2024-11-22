@@ -32,6 +32,7 @@ model = genai.GenerativeModel(
 history = []
 
 print("Hello, how can I help you today?")
+print("")
 
 while True:
     try:
