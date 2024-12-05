@@ -234,8 +234,16 @@ class UserAPI:
                     "message": "Failed to invalidate token",
                     "error": str(e)
                 }, 500
+    class _ID(Resource):  # Individual identification API operation
+        @token_required()
+        def get(self):
+            ''' Retrieve the current user from the token_required authentication check '''
+            current_user = g.current_user
+            ''' Return the current user as a json object '''
+            return jsonify(current_user.read())
 
 # Register the API resources with the Blueprint
+api.add_resource(UserAPI._ID, '/id')
 api.add_resource(UserAPI._BULK_CRUD, '/users')
 api.add_resource(UserAPI._CRUD, '/user')
 api.add_resource(UserAPI._Security, '/authenticate')

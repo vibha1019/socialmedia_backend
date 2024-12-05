@@ -1,10 +1,16 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_login import LoginManager
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
 import os
+import google.generativeai as genai
+
+# Use the API key from environment variables
+genai.configure(api_key=os.environ.get('GOOGLE_GENERATIVEAI_API_KEY'))
+
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,7 +22,7 @@ app = Flask(__name__)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-# Allowed servers for cross-origin resource sharing (CORS), these are GitHub Pages and localhost for GitHub Pages testing
+# Allowed servers for cross-origin resource sharing (CORS)
 cors = CORS(app, supports_credentials=True, origins=['http://localhost:4887', 'http://127.0.0.1:4887', 'https://nighthawkcoders.github.io'])
 
 # System Defaults
@@ -40,7 +46,6 @@ DB_USERNAME = os.environ.get('DB_USERNAME') or None
 DB_PASSWORD = os.environ.get('DB_PASSWORD') or None
 if DB_ENDPOINT and DB_USERNAME and DB_PASSWORD:
     # Production - Use MySQL
-    
     DB_PORT = '3306'
     DB_NAME = dbName
     dbString = f'mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_ENDPOINT}:{DB_PORT}'
@@ -79,3 +84,46 @@ app.config['GITHUB_TARGET_NAME'] = os.environ.get('GITHUB_TARGET_NAME') or 'nigh
 app.config['KASM_SERVER'] = os.environ.get('KASM_SERVER') or 'https://kasm.nighthawkcodingsociety.com'
 app.config['KASM_API_KEY'] = os.environ.get('KASM_API_KEY') or None
 app.config['KASM_API_KEY_SECRET'] = os.environ.get('KASM_API_KEY_SECRET') or None
+
+# Configure AI model
+genai.configure(api_key=os.environ.get('GOOGLE_GENERATIVEAI_API_KEY'))
+
+generation_config = {
+    "temperature": 1.15,
+    "top_p": 0.95,
+    "top_k": 40,
+    "max_output_tokens": 8192,
+    "response_mime_type": "text/plain",
+}
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-pro",
+    generation_config=generation_config,
+    system_instruction="You are an assistant capable of answering questions and having conversations."
+)
+
+# Chat history
+chat_history = []
+
+# AI chat endpoint
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_input = request.json.get('user_input', '')
+    if not user_input:
+        return jsonify({"error": "No input provided"}), 400
+
+    try:
+        # Start chat session
+        chat_session = model.start_chat(history=chat_history)
+        response = chat_session.send_message(user_input)
+
+        # Update chat history
+        assistant_response = response.text
+        chat_history.append({"role": "user", "parts": [user_input]})
+        chat_history.append({"role": "assistant", "parts": [assistant_response]})
+
+        return jsonify({"response": assistant_response})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
